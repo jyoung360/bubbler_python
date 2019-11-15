@@ -1,0 +1,4 @@
+numpy==1.17.3
+paho-mqtt==1.5.0
+redis==3.3.11
+websockets==8.1
