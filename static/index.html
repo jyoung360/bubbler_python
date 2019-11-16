@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Bubble Detector 9000</title>
+  <link rel=stylesheet type=text/css href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap.min.css" media="all">
+  <style>
+    .axis text {
+      font: 10px sans-serif;
+    }
+    .chartTitle {
+      font-size: 12px;
+      font-weight: bold;
+      text-anchor: middle; 
+    }
+    .axis .title {
+      font-weight: bold;
+      text-anchor: middle;
+    }
+    .axis path,
+    .axis line {
+      fill: none;
+      stroke: #000;
+      shape-rendering: crispEdges;
+    }
+    .x.axis path {
+      fill: none;
+      stroke: #000;
+      shape-rendering: crispEdges;
+    }
+    .nav .area {
+      fill: lightgrey;
+      stroke-width: 0px;
+    }
+    .nav .line {
+      fill: none;
+      stroke: darkgrey;
+      stroke-width: 1px;
+    }
+    .viewport {
+      stroke: grey;
+      fill: black;
+      fill-opacity: 0.3;
+    }
+    .viewport .extent {
+      fill: green;
+    }
+    .well {
+      padding-top: 0px;
+      padding-bottom: 0px;
+    }
+
+    .line {
+      fill: none;
+      stroke: #ffab00;
+      stroke-width: 3;
+    }
+
+    .axis path,
+    .axis line {
+      fill: none;
+      stroke: #000;
+      shape-rendering: crispEdges;
+    }
+
+    #viewDiv, #barDiv {
+      float: left;
+      margin-left: 10px;
+    }
+  </style>
+<body>
+
+<div>
+  <div class="well">
+    <h4>Bubble Detection</h4> 
+  </div>
+  <!-- <input id="debug" type="checkbox" name="debug" value="debug" style="margin-bottom: 10px" /> Debug
+  <input id="halt" type="checkbox" name="halt" value="halt" style="margin-bottom: 10px" /> Halt -->
+  <div id="viewDiv"></div>
+  <div id="barDiv"></div>
+</div>
+
+<!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js"></script> -->
+<script src="https://d3js.org/d3.v5.js"></script>
+<script src="realtimeChart.js"></script>
+<script>
+'use strict';
+
+var chart = realTimeChartMulti()
+    .title("Raw Bubble Data")
+    .yTitle("Analog Signal")
+    .xTitle("Time")
+    .yDomain([1800,3000])
+    .border(true)
+    .width(600)
+    .height(350);
+
+var chartDiv = d3.select("#viewDiv").append("div")
+    .attr("id", "chartDiv")
+    .call(chart);
+
+d3.select("#debug").on("change", function() {
+  var state = d3.select(this).property("checked")
+  chart.debug(state);
+})
+
+d3.select("#halt").on("change", function() {
+  var state = d3.select(this).property("checked")
+  chart.halt(state);
+})
+
+
+var tX = 5; // time constant, multiple of one second
+var meanMs = 1000 * tX, // milliseconds
+    dev = 200 * tX; // std dev
+
+// define time scale
+var timeScale = d3.scaleLinear()
+    .domain([300 * tX, 1700 * tX])
+    .range([300 * tX, 1700 * tX])
+    .clamp(true);
+
+// var color = d3.scale.category10();
+
+// in a normal use case, real time data would arrive through the network or some other mechanism
+var d = -1;
+var shapes = ["rect", "circle"];
+var timeout = 0;
+
+var ws = new WebSocket("ws://34.217.20.120:5678/");
+var messages = document.createElement('ul');
+ws.onopen = function() {
+    ws.send({ foo: 'bar'});
+    setInterval(() => {
+      ws.send('hello world');
+    }, 6000);
+}
+
+var valueline = d3.line()
+    .x(function(d) { return x(d.date); })
+    .y(function(d) { return y(d.value); })
+    .curve(d3.curveMonotoneX);
+
+var margin = {top: 40, right: 20, bottom: 70, left: 80},
+    width = 700 - margin.left - margin.right,
+    height = 350 - margin.top - margin.bottom;
+
+var	parseDate = d3.timeParse("%Y-%m-%d %H:%M:%S");
+var svg = d3.select("#barDiv").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .style("border", function(d) { 
+      return "1px solid lightgray"; 
+    })
+    .append("g")
+    .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+
+svg.append("text")
+  .attr("class", "chartTitle")
+  .attr("x", width / 2)
+  .attr("y", -20)
+  .attr("dy", ".71em")
+  .text(function(d) { 
+    return 'Bubbles Over Time'; 
+  });
+
+svg.append("text")
+  .attr("class", "title")
+  .attr("transform", "rotate(-90)")
+  .attr("x", -height + 50)
+  .attr("y", -margin.left + 15) //-35
+  .attr("dy", ".71em")
+  .text(function(d) { 
+    return 'Bubbles per hour'; 
+  });
+
+var line = svg.append("path")
+  .attr("class", "line")  
+  .attr("d", valueline([])); 
+
+var x = d3.scaleTime().rangeRound([0, width])
+var y = d3.scaleLinear().rangeRound([height, 0]);
+var xAxis = d3.axisBottom(x)
+              .ticks(d3.timeHour.every(4))
+              .tickFormat((d3.timeFormat("%m/%d %H:%M")));
+
+var yAxis = d3.axisLeft(y).ticks(10);
+
+svg.append("g")
+  .attr("class", "x axis")
+  .attr("transform", "translate(0," + height + ")")
+  .call(xAxis)
+  .selectAll("text")
+  .style("text-anchor", "end")
+  .attr("dx", "-.8em")
+  .attr("dy", "-.55em")
+  .attr("transform", "rotate(-90)" );
+
+svg.append("g")
+  .attr("class", "y axis")
+  .call(yAxis)
+  .append("text")
+  .attr("transform", "rotate(-90)")
+
+ws.onmessage = function (event) {
+    const data = JSON.parse(event.data);
+    if(data.messageType === 'fake') {
+        var finalData = data.data.map((d)=>{
+            d.date = parseDate(d.date);
+            d.value = +d.value;
+            return d;
+        }).sort((a, b) => {
+          return a.date - b.date
+        });
+
+        const tmpData = finalData.slice(0);
+        const mappedDates = {};
+        tmpData.forEach((d) => {
+          // const hourDate = new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), d.date.getHours());
+          const hourDate = `${d.date.getFullYear()}-${d.date.getMonth()}-${d.date.getDate()} ${d.date.getHours()}`;
+          mappedDates[hourDate] = mappedDates[hourDate] || 0;
+          mappedDates[hourDate] += d.value;
+        });
+
+        const newFinalData = [];
+        const parser = d3.timeParse("%Y-%m-%d %H");
+        for(var i in mappedDates) {
+          newFinalData.push({
+            date: parser(i),
+            value: mappedDates[i]
+          })
+        }
+        finalData = newFinalData;
+
+        const dates = [finalData[0].date, finalData[finalData.length-1].date];
+        const dates2 = finalData.map(function(d) { return d.date; });
+        x.domain(d3.extent(finalData, function(d) { return d.date; }));
+        y.domain([0, d3.max(finalData, function(d) { return d.value; })]);
+
+        svg.select(".line")
+          .attr("d", valueline(finalData)); 
+
+        svg.select(".x.axis") // change the x axis
+            .call(xAxis)
+            .selectAll("text")
+            .style("text-anchor", "end")
+            .attr("dx", "-.8em")
+            .attr("dy", "-.55em")
+            .attr("transform", "rotate(-90)" );
+
+        svg.select(".y.axis") // change the y axis
+            .call(yAxis)
+            .append("text")
+            .attr("transform", "rotate(-90)")
+    }
+    else {
+        data.forEach((d,i) => {
+            var now = new Date(d.date+"Z");
+            var obj;
+            obj = {
+                time: now,
+                opacity: 1,
+                category: "Category",
+                analog: d.voltage,
+                type: "circle",
+                size: 2,
+            };
+
+            chart.datum(obj);   
+        });
+    }
+};
+</script>
