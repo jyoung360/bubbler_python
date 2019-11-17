@@ -3,7 +3,9 @@
 <head>
   <meta charset="utf-8">
   <title>Bubble Detector 9000</title>
-  <link rel=stylesheet type=text/css href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap.min.css" media="all">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+
+  <!-- <link rel=stylesheet type=text/css href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/2.3.2/css/bootstrap.min.css" media="all"> -->
   <style>
     .axis text {
       font: 10px sans-serif;
@@ -76,12 +78,98 @@
   </div>
   <!-- <input id="debug" type="checkbox" name="debug" value="debug" style="margin-bottom: 10px" /> Debug
   <input id="halt" type="checkbox" name="halt" value="halt" style="margin-bottom: 10px" /> Halt -->
-  <div id="viewDiv"></div>
-  <div id="barDiv"></div>
+  <div style="height: 400px">
+    <div id="viewDiv"></div>
+    <div id="barDiv"></div>
+  </div>
+  <div class="container">
+    <div class="row">
+      <div class="col-4">
+        <div class="input-group mb-3">
+          <div class="input-group-prepend">
+            <span class="input-group-text">Bubble Volume</span>
+          </div>
+          <input type="text" id="average_bubble_size" class="form-control">
+          <div class="input-group-append">
+            <span class="input-group-text">ml</span>
+          </div>
+        </div>
+        <div class="input-group mb-3">
+          <div class="input-group-prepend">
+            <span class="input-group-text">Liquid Volume</span>
+          </div>
+          <input type="text" id="liquid_volume" class="form-control">
+          <div class="input-group-append">
+            <span class="input-group-text">ml</span>
+          </div>
+        </div>
+      </div>
+      <div class="col-4">
+        <div class="input-group mb-3">
+          <div class="input-group-prepend">
+            <span class="input-group-text">Total Bubbles</span>
+          </div>
+          <input id="total_bubbles" type="text" disabled class="form-control">
+        </div>
+        <div class="input-group mb-3">
+          <div class="input-group-prepend">
+            <span class="input-group-text">Total CO2 Volume</span>
+          </div>
+          <input type="text" id="total_volume" disabled class="form-control">
+          <div class="input-group-append">
+            <span class="input-group-text">L</span>
+          </div>
+        </div>
+        <div class="input-group mb-3">
+          <div class="input-group-prepend">
+            <span class="input-group-text">STP CO2 Volume</span>
+          </div>
+          <input type="text" id="stp_volume" disabled class="form-control">
+          <div class="input-group-append">
+            <span class="input-group-text">L</span>
+          </div>
+        </div>
+      <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text">Moles CO2</span>
+        </div>
+        <input type="text" id="moles" disabled class="form-control">
+        <div class="input-group-append">
+          <span class="input-group-text">moles</span>
+        </div>
+      </div>
+      <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text">Mass CO2</span>
+        </div>
+        <input type="text" id="mass_co2" disabled class="form-control">
+        <div class="input-group-append">
+          <span class="input-group-text">g</span>
+        </div>
+      </div>
+      <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text">Mass Ethanol</span>
+        </div>
+        <input type="text" id="mass_ethanol" disabled class="form-control">
+        <div class="input-group-append">
+          <span class="input-group-text">g</span>
+        </div>
+      </div>
+    </div>
+    <div class="col-4">
+      <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text">Current %</span>
+        </div>
+        <input id="alcohol_percent" type="text" disabled class="form-control">
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js"></script> -->
-<script src="https://d3js.org/d3.v5.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/5.12.0/d3.js"></script>
 <script src="realtimeChart.js"></script>
 <script>
 'use strict';
@@ -202,6 +290,40 @@ svg.append("g")
   .append("text")
   .attr("transform", "rotate(-90)")
 
+const average_bubble_size = document.querySelector('#average_bubble_size');
+const liquid_volume = document.querySelector('#liquid_volume');
+average_bubble_size.onchange = calculateValues;
+liquid_volume.onchange = calculateValues;
+function calculateValues(e) {
+  const molarVolume = 22.4;
+  const molarMassCO2 = 44.01;
+  const molarMassEthanol = 46.07;
+  const totalBubbles = document.querySelector("#total_bubbles").value;
+  const totalVolume = document.querySelector("#liquid_volume").value;
+  const bubbleVolume = document.querySelector("#average_bubble_size").value;
+  const pressureInitial = 101.3;
+  const pressureFinal = 101.3;
+  const tempInitial = 273.15;
+  const tempFinal = 298;
+  const finalVolume = totalBubbles * bubbleVolume/1000;
+
+  const standardVolume = (pressureFinal * finalVolume * tempInitial)/(pressureInitial * tempFinal);
+  const moles = standardVolume/molarVolume;
+  const massCO2 = molarMassCO2 * moles;
+  const massEthanol = molarMassEthanol * moles;
+  const percentEthanol = (massEthanol / totalVolume)*100;
+  document.querySelector("#total_volume").value = finalVolume.toFixed(2);
+  document.querySelector("#stp_volume").value = standardVolume.toFixed(2);
+  document.querySelector("#moles").value = moles.toFixed(2);
+  document.querySelector("#mass_co2").value = massCO2.toFixed(2);
+  document.querySelector("#mass_ethanol").value = massEthanol.toFixed(2);
+  document.querySelector("#alcohol_percent").value = percentEthanol.toFixed(2);
+};
+
+function handleChange(e) {
+  log.textContent = `The field's value is
+      ${e.target.value.length} character(s) long.`;
+}
 ws.onmessage = function (event) {
     const data = JSON.parse(event.data);
     if(data.messageType === 'fake') {
@@ -209,6 +331,8 @@ ws.onmessage = function (event) {
             d.date = parseDate(d.date);
             d.value = +d.value;
             return d;
+        }).filter((d)=>{
+          return d.date >= new Date('2019-11-15T00:00:00');
         }).sort((a, b) => {
           return a.date - b.date
         });
@@ -217,7 +341,7 @@ ws.onmessage = function (event) {
         const mappedDates = {};
         tmpData.forEach((d) => {
           // const hourDate = new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), d.date.getHours());
-          const hourDate = `${d.date.getFullYear()}-${d.date.getMonth()}-${d.date.getDate()} ${d.date.getHours()}`;
+          const hourDate = `${d.date.getFullYear()}-${d.date.getMonth()+1}-${d.date.getDate()} ${d.date.getHours()}`;
           mappedDates[hourDate] = mappedDates[hourDate] || 0;
           mappedDates[hourDate] += d.value;
         });
@@ -231,6 +355,13 @@ ws.onmessage = function (event) {
           })
         }
         finalData = newFinalData;
+
+        const total = finalData.reduce((accumulator, currentValue) => {
+          return accumulator + currentValue.value;
+        }, 0);
+
+        var logElem = document.querySelector("#total_bubbles");
+        logElem.value = total;
 
         const dates = [finalData[0].date, finalData[finalData.length-1].date];
         const dates2 = finalData.map(function(d) { return d.date; });
