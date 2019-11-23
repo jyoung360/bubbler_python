@@ -178,7 +178,7 @@ var chart = realTimeChartMulti()
     .title("Raw Bubble Data")
     .yTitle("Analog Signal")
     .xTitle("Time")
-    .yDomain([1800,3000])
+    .yDomain([1600,2400])
     .border(true)
     .width(600)
     .height(350);
@@ -215,14 +215,108 @@ var d = -1;
 var shapes = ["rect", "circle"];
 var timeout = 0;
 
-var ws = new WebSocket("ws://34.217.20.120:5678/");
-var messages = document.createElement('ul');
-ws.onopen = function() {
+function connect() {
+  var ws = new WebSocket("ws://bubbler.youngstranowedding.com:5678/");
+  ws.onopen = function() {
+    console.log('opened websocket connection')
     ws.send({ foo: 'bar'});
     setInterval(() => {
-      ws.send('hello world');
-    }, 6000);
+      ws.send({ foo: 'bar'});
+    }, 60000);
+  };
+
+  ws.onmessage = function (event) {
+    const data = JSON.parse(event.data);
+    if(data.messageType === 'fake') {
+      var finalData = data.data.map((d)=>{
+          d.date = parseDate(d.date);
+          d.value = +d.value;
+          return d;
+      }).filter((d)=>{
+        return d.date >= new Date('2019-11-15T00:00:00');
+      }).sort((a, b) => {
+        return a.date - b.date
+      });
+
+      const tmpData = finalData.slice(0);
+      const mappedDates = {};
+      tmpData.forEach((d) => {
+        // const hourDate = new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), d.date.getHours());
+        const hourDate = `${d.date.getFullYear()}-${d.date.getMonth()+1}-${d.date.getDate()} ${d.date.getHours()}`;
+        mappedDates[hourDate] = mappedDates[hourDate] || 0;
+        mappedDates[hourDate] += d.value;
+      });
+
+      const newFinalData = [];
+      const parser = d3.timeParse("%Y-%m-%d %H");
+      for(var i in mappedDates) {
+        newFinalData.push({
+          date: parser(i),
+          value: mappedDates[i]
+        })
+      }
+      finalData = newFinalData;
+
+      const total = finalData.reduce((accumulator, currentValue) => {
+        return accumulator + currentValue.value;
+      }, 0);
+
+      var logElem = document.querySelector("#total_bubbles");
+      logElem.value = total;
+
+      const dates = [finalData[0].date, finalData[finalData.length-1].date];
+      const dates2 = finalData.map(function(d) { return d.date; });
+      x.domain(d3.extent(finalData, function(d) { return d.date; }));
+      y.domain([0, d3.max(finalData, function(d) { return d.value; })]);
+
+      svg.select(".line")
+        .attr("d", valueline(finalData)); 
+
+      svg.select(".x.axis") // change the x axis
+          .call(xAxis)
+          .selectAll("text")
+          .style("text-anchor", "end")
+          .attr("dx", "-.8em")
+          .attr("dy", "-.55em")
+          .attr("transform", "rotate(-90)" );
+
+      svg.select(".y.axis") // change the y axis
+          .call(yAxis)
+          .append("text")
+          .attr("transform", "rotate(-90)")
+    }
+    else {
+      data.forEach((d,i) => {
+          var now = new Date(d.date+"Z");
+          var obj;
+          obj = {
+              time: now,
+              opacity: 1,
+              category: "Category",
+              analog: d.voltage,
+              type: "circle",
+              size: 2,
+          };
+
+          chart.datum(obj);   
+      });
+    }
+  };
+
+  ws.onclose = function(e) {
+    console.log('Socket is closed. Reconnect will be attempted in 1 second.', e.reason);
+    setTimeout(function() {
+      connect();
+    }, 1000);
+  };
+
+  ws.onerror = function(err) {
+    console.error('Socket encountered error: ', err.message, 'Closing socket');
+    ws.close();
+  };
 }
+
+connect();
 
 var valueline = d3.line()
     .x(function(d) { return x(d.date); })
@@ -292,8 +386,10 @@ svg.append("g")
 
 const average_bubble_size = document.querySelector('#average_bubble_size');
 const liquid_volume = document.querySelector('#liquid_volume');
+const total_bubbles = document.querySelector("#total_bubbles");
 average_bubble_size.onchange = calculateValues;
 liquid_volume.onchange = calculateValues;
+total_bubbles.onchange = calculateValues;
 function calculateValues(e) {
   const molarVolume = 22.4;
   const molarMassCO2 = 44.01;
@@ -324,81 +420,5 @@ function handleChange(e) {
   log.textContent = `The field's value is
       ${e.target.value.length} character(s) long.`;
 }
-ws.onmessage = function (event) {
-    const data = JSON.parse(event.data);
-    if(data.messageType === 'fake') {
-        var finalData = data.data.map((d)=>{
-            d.date = parseDate(d.date);
-            d.value = +d.value;
-            return d;
-        }).filter((d)=>{
-          return d.date >= new Date('2019-11-15T00:00:00');
-        }).sort((a, b) => {
-          return a.date - b.date
-        });
 
-        const tmpData = finalData.slice(0);
-        const mappedDates = {};
-        tmpData.forEach((d) => {
-          // const hourDate = new Date(d.date.getFullYear(), d.date.getMonth(), d.date.getDate(), d.date.getHours());
-          const hourDate = `${d.date.getFullYear()}-${d.date.getMonth()+1}-${d.date.getDate()} ${d.date.getHours()}`;
-          mappedDates[hourDate] = mappedDates[hourDate] || 0;
-          mappedDates[hourDate] += d.value;
-        });
-
-        const newFinalData = [];
-        const parser = d3.timeParse("%Y-%m-%d %H");
-        for(var i in mappedDates) {
-          newFinalData.push({
-            date: parser(i),
-            value: mappedDates[i]
-          })
-        }
-        finalData = newFinalData;
-
-        const total = finalData.reduce((accumulator, currentValue) => {
-          return accumulator + currentValue.value;
-        }, 0);
-
-        var logElem = document.querySelector("#total_bubbles");
-        logElem.value = total;
-
-        const dates = [finalData[0].date, finalData[finalData.length-1].date];
-        const dates2 = finalData.map(function(d) { return d.date; });
-        x.domain(d3.extent(finalData, function(d) { return d.date; }));
-        y.domain([0, d3.max(finalData, function(d) { return d.value; })]);
-
-        svg.select(".line")
-          .attr("d", valueline(finalData)); 
-
-        svg.select(".x.axis") // change the x axis
-            .call(xAxis)
-            .selectAll("text")
-            .style("text-anchor", "end")
-            .attr("dx", "-.8em")
-            .attr("dy", "-.55em")
-            .attr("transform", "rotate(-90)" );
-
-        svg.select(".y.axis") // change the y axis
-            .call(yAxis)
-            .append("text")
-            .attr("transform", "rotate(-90)")
-    }
-    else {
-        data.forEach((d,i) => {
-            var now = new Date(d.date+"Z");
-            var obj;
-            obj = {
-                time: now,
-                opacity: 1,
-                category: "Category",
-                analog: d.voltage,
-                type: "circle",
-                size: 2,
-            };
-
-            chart.datum(obj);   
-        });
-    }
-};
 </script>

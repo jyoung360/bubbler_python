@@ -30,7 +30,7 @@ import time, threading
 WAIT_SECONDS = 1
 
 def ticker():
-    global message
+    global message, average
     valids = filter(lambda x : x['voltage'] > average + 50 or x['voltage'] < average - 50, message)
     validList = list(valids)
 
@@ -93,7 +93,7 @@ def on_message(client, userdata, msg):
         data['date'] = datetime.datetime.utcnow()
         data['voltage'] = int(msg.payload)
         message.append(data)
-        if(voltage > average + 30 or voltage < average - 30):
+        if(voltage > average + 50 or voltage < average - 50):
             bubbles.append(data)
 
     except Exception as e:
