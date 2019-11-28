@@ -10,7 +10,7 @@ def on_connect(client, userdata, flags, rc):
 
     # Subscribing in on_connect() means that if we lose the connection and
     # reconnect then subscriptions will be renewed.
-    client.subscribe("$SYS/#")
+    client.subscribe("freezer/temperature")
 
 # The callback for when a PUBLISH message is received from the server.
 def on_message(client, userdata, msg):
@@ -21,11 +21,13 @@ client.on_connect = on_connect
 client.on_message = on_message
 
 client.username_pw_set(MQTT_USER, password=MQTT_PWD)
-client.connect(MQTT_HOST", 1883, 60)
+client.connect(MQTT_HOST, 1883, 60)
 
 # Blocking call that processes network traffic, dispatches callbacks and
 # handles reconnecting.
 # Other loop*() functions are available that give a threaded interface and a
 # manual interface.
-client.publish("bubbles/count", 123)
+# client.publish("freezer/target", 3)
+
+client.loop_forever()
 

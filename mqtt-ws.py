@@ -129,10 +129,12 @@ async def consumer_handler(websocket, path):
 
 async def producer_handler(websocket, path):
     global bubbles
+    
     while True:
         # message = await producer()
-        response = json.dumps(bubbles, default = myconverter)
-        await websocket.send(response)
+        if(len(bubbles) > 0):
+            response = json.dumps(bubbles, default = myconverter)
+            await websocket.send(response)
         bubbles = []
         await asyncio.sleep(1)
 
